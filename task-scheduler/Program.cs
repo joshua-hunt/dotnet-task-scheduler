@@ -16,4 +16,4 @@ services.AddScoped<App>();
 using var serviceProvider = services.BuildServiceProvider();
 var app = serviceProvider.GetRequiredService<App>();
 
-await app.Run();
+app.Run();

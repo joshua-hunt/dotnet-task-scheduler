@@ -14,14 +14,14 @@ namespace task_scheduler
             _userCLI = userCLI;
         }
 
-        public async Task Run()
+        public void Run()
         {
             _logger.LogInformation("Starting up...");
 
             // CLI for user interaction
             _userCLI.Run();
             _logger.LogInformation("Shutting down...");
-
+            return;
         }
     }
 }
