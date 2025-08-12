@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using System;
 using task_scheduler.Interfaces;
 
 namespace task_scheduler.Util
@@ -55,12 +54,14 @@ namespace task_scheduler.Util
                             break;
                         }
                         var isRecurring = isRecurringInput == "yes" || isRecurringInput == "y";
-                        var recurTimeValue = 0;
+                        var recurTimeValue = TimeSpan.Zero;
                         if (isRecurring)
                         {
                             Console.WriteLine("Recur time in seconds: ");
                             var recurTime = Console.ReadLine()?.Trim().ToLower();
-                            recurTimeValue = int.TryParse(recurTime, out var parsedRecurTime) ? parsedRecurTime : 0;
+                            recurTimeValue = int.TryParse(recurTime, out var parsedRecurTime)
+                                ? TimeSpan.FromSeconds(parsedRecurTime)
+                                : TimeSpan.Zero;
                         }
                         
                         _scheduler.ScheduleTask(name, time, actionName, isRecurring, recurTimeValue);

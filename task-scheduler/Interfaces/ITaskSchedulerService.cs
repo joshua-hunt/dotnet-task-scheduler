@@ -4,7 +4,7 @@ namespace task_scheduler.Interfaces
 {
     public interface ITaskSchedulerService
     {
-        void ScheduleTask(string taskName, DateTime scheduledTime, string action, bool recurring, double recurTime);
+        void ScheduleTask(string taskName, DateTime scheduledTime, string action, bool recurring, TimeSpan recurTime);
         void ListTasks();
         void Stop();
     }
