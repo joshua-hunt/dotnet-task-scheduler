@@ -17,8 +17,6 @@ namespace task_scheduler.Tests
             _mockLogger = new Mock<ILogger<TaskSchedulerService>>();
         }
 
-        // Tests will verify that a task is scheduled correctly using the log information and reflection.
-
         [Fact]
         public void TaskRegisteredCorrectlyWithLogging()
         {
@@ -44,17 +42,17 @@ namespace task_scheduler.Tests
             service.Stop();
         }
 
-        [Fact(Skip = "Was not able to get working")]
+        [Fact]
         public async Task TaskExecutesAtRightTime()
         {
             var service = new TaskSchedulerService(_mockLogger.Object);
 
             var executedTasks = new List<(string Name, DateTime ExecutionTime)>();
 
-            //service.OnTaskExecuted = task =>
-            //{
-            //    executedTasks.Add((task.Name, DateTime.Now));
-            //};
+            service.OnTaskExecuted += task =>
+            {
+                executedTasks.Add((task.Name, DateTime.Now));
+            }; 
 
             var scheduledTime = DateTime.Now.AddMilliseconds(500);
             service.ScheduleTask("task1", scheduledTime, "action", false);
@@ -73,7 +71,7 @@ namespace task_scheduler.Tests
             service.Stop();
         }
 
-        [Fact (Skip = "Could not figure out in time")]
+        [Fact (Skip = "Will implement later")]
         public async Task QueuedTasksExecuteSequentially()
         {
         }
@@ -89,7 +87,6 @@ namespace task_scheduler.Tests
 
             service.ScheduleTask("recurring", startTime, "action", true, recurrenceSeconds);
 
-            // Check initial task exists with correct properties
             var tasks = service.GetScheduledTasksForTesting();
             var initialTask = tasks.FirstOrDefault(t =>
                 t.Name == "recurring" &&
@@ -112,7 +109,7 @@ namespace task_scheduler.Tests
                 t.Action == "action" &&
                 t.IsRecurring &&
                 t.RecurrenceTime == recurrenceSeconds &&
-                t.ScheduledTime >= initialTask.ScheduledTime.AddSeconds(recurrenceSeconds - 0.1) // allow a small tolerance
+                t.ScheduledTime >= initialTask.ScheduledTime.AddSeconds(recurrenceSeconds - 0.1)
             );
 
             Assert.NotNull(rescheduledTask);
