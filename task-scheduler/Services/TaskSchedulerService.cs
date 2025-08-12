@@ -11,16 +11,14 @@ namespace task_scheduler.Services
         private readonly CancellationTokenSource _cts = new();
         private CancellationTokenSource _delayCts = new();
 
-        // for list and testing
-        private List<ScheduledTask> _taskList = new();
-
         public TaskSchedulerService(ILogger<TaskSchedulerService> logger)
         {
             _logger = logger;
             Task.Run(ProcessTasksAsync);
         }
 
-        public IReadOnlyCollection<ScheduledTask> GetScheduledTasksForTesting() => _taskList.ToList().AsReadOnly();
+        // Expose the task list for testing purposes
+        public IReadOnlyCollection<ScheduledTask> GetScheduledTasksForTesting() => _taskQueue.UnorderedItems.Select(item => item.Element).ToList().AsReadOnly();
         public event Action<ScheduledTask> OnTaskExecuted;
 
         public void ScheduleTask(string taskName, DateTime scheduledTime, string action, bool isRecurring, double recurTime = 0)
@@ -36,7 +34,6 @@ namespace task_scheduler.Services
             lock (_taskQueue)
             {
                 _taskQueue.Enqueue(newTask, newTask.ScheduledTime);
-                _taskList.Add(newTask);
             }
             _delayCts.Cancel();
             _logger.LogInformation($"Scheduled task '{taskName}' for {scheduledTime} (Recurring: {isRecurring})");
@@ -89,7 +86,6 @@ namespace task_scheduler.Services
                         if (_taskQueue.Count > 0 && _taskQueue.Peek().ScheduledTime <= DateTime.Now)
                         {
                             taskToRun = _taskQueue.Dequeue();
-                            _taskList.Remove(taskToRun);
                         }
                     }
 
@@ -131,7 +127,7 @@ namespace task_scheduler.Services
 
         public void ListTasks()
         {
-            var tasks = _taskList.ToList();
+            var tasks = GetScheduledTasksForTesting();
             if (tasks.Count == 0)
             {
                 _logger.LogInformation("No tasks scheduled.");
