@@ -6,10 +6,15 @@ namespace task_scheduler.Services
 {
     public class TaskSchedulerService : ITaskSchedulerService
     {
-        private readonly ILogger<TaskSchedulerService> _logger;
         private readonly PriorityQueue<ScheduledTask, DateTime> _taskQueue = new();
+
+        //Cancellation token source to manage task processing cycle
         private readonly CancellationTokenSource _cts = new();
+
+        //Cancellation token source for managing new task scheduling
         private CancellationTokenSource _delayCts = new();
+
+        private readonly ILogger<TaskSchedulerService> _logger;
 
         public TaskSchedulerService(ILogger<TaskSchedulerService> logger)
         {
@@ -17,11 +22,14 @@ namespace task_scheduler.Services
             Task.Run(ProcessTasksAsync);
         }
 
-        // Expose the task list for testing purposes
-        public IReadOnlyCollection<ScheduledTask> GetScheduledTasksForTesting() => _taskQueue.UnorderedItems.Select(item => item.Element).ToList().AsReadOnly();
-        public event Action<ScheduledTask> OnTaskExecuted;
+        //Expose a readonly version of the task list  - this is currently only used for testing
+        public IReadOnlyCollection<ScheduledTask> GetScheduledTasksForTesting() => _taskQueue.UnorderedItems.OrderBy(x => x.Priority).Select(item => item.Element).ToList().AsReadOnly();
 
-        public void ScheduleTask(string taskName, DateTime scheduledTime, string action, bool isRecurring, double recurTime = 0)
+        //Event to notify when a task is executed - this is currently only used for testing
+        public event Action<ScheduledTask>? OnTaskExecuted;
+
+        //Recur time is in seconds, default is 0 which means no recurrence
+        public void ScheduleTask(string taskName, DateTime scheduledTime, string action, bool isRecurring, TimeSpan recurTime = default)
         {
             var newTask = new ScheduledTask
             {
@@ -31,32 +39,39 @@ namespace task_scheduler.Services
                 IsRecurring = isRecurring,
                 RecurrenceTime = recurTime
             };
+
+            //Lock to ensure thread safety when adding tasks to the queue
             lock (_taskQueue)
             {
                 _taskQueue.Enqueue(newTask, newTask.ScheduledTime);
             }
+
             _delayCts.Cancel();
             _logger.LogInformation($"Scheduled task '{taskName}' for {scheduledTime} (Recurring: {isRecurring})");
         }
 
         public async Task ProcessTasksAsync()
         {
+            //Run until cancellation is requested
             while (!_cts.Token.IsCancellationRequested)
             {
                 try
                 {
+                    //Check for the next task in the queue
                     ScheduledTask nextTask = null;
                     DateTime nextTime = DateTime.MaxValue;
 
+                    // Lock to safely access the task queue
                     lock (_taskQueue)
                     {
+                        // Peek at the next task without removing it
                         if (_taskQueue.Count > 0)
                         {
                             nextTask = _taskQueue.Peek();
                             nextTime = nextTask.ScheduledTime;
                         }
                     }
-
+                    // If no tasks are scheduled, wait for a while before checking again
                     if (nextTask == null)
                     {
                         await Task.Delay(500, _cts.Token);
@@ -66,12 +81,14 @@ namespace task_scheduler.Services
                     var delay = nextTime - DateTime.Now;
                     if (delay > TimeSpan.Zero)
                     {
-                        // cancels any previous delay task
+                        //Cancel previous delay if any, because a new task was scheduled
                         _delayCts.Cancel();
+                        //Fresh token linked to stop token
                         _delayCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
 
                         try
                         {
+                            //Asynchronously wait until next task's time or until canceled
                             await Task.Delay(delay, _delayCts.Token);
                         }
                         catch (OperationCanceledException)
@@ -80,28 +97,34 @@ namespace task_scheduler.Services
                         }
                     }
 
+                    //After the delay, check if the task is ready to run
                     ScheduledTask taskToRun = null;
+
+                    //Lock to safely access the task queue
                     lock (_taskQueue)
                     {
+                        //If the next task is ready to run, dequeue it
                         if (_taskQueue.Count > 0 && _taskQueue.Peek().ScheduledTime <= DateTime.Now)
                         {
                             taskToRun = _taskQueue.Dequeue();
                         }
                     }
 
+                    //If a task is ready to run, execute it
                     if (taskToRun != null)
                     {
                         _logger.LogInformation($"Executing task: {taskToRun.Name} at {taskToRun.ScheduledTime}");
+
+                        //Invoke the event to notify that a task is executed
                         OnTaskExecuted?.Invoke(taskToRun);
 
                         try
                         {
-                            if (taskToRun.Action == "error")
-                                throw new InvalidOperationException("Simulated task error");
-
+                            //Simulate task execution
                             if (taskToRun.IsRecurring)
                             {
-                                taskToRun.ScheduledTime = taskToRun.ScheduledTime.AddSeconds(taskToRun.RecurrenceTime);
+                                //For recurring tasks, reschedule them with the new scheduled time
+                                taskToRun.ScheduledTime = taskToRun.ScheduledTime.Add(taskToRun.RecurrenceTime);
                                 _taskQueue.Enqueue(taskToRun, taskToRun.ScheduledTime);
                                 _logger.LogInformation($"Rescheduled recurring task '{taskToRun.Name}' for {taskToRun.ScheduledTime}");
                             }
@@ -114,12 +137,14 @@ namespace task_scheduler.Services
                 }
                 catch (OperationCanceledException)
                 {
+                    //Figure out how to log task cancellation
                     _logger.LogInformation("Task processing cancelled.");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Unexpected error in task processing loop.");
+                    //Figure out how to log unexpected task errors
+                    _logger.LogError(ex, $"Unexpected error in task processing loop for task");
                     await Task.Delay(1000, _cts.Token);
                 }
             }
