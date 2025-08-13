@@ -89,8 +89,8 @@ namespace task_scheduler.Tests
             service.Stop();
         }
 
-
-        [Fact(Skip = "Couldnt figure out")]
+        [Fact]
+        //[Fact(Skip = "Couldnt figure out")]
         public async Task RecurringTaskIsRescheduled()
         {
             //Arrange - create a service instance and set up a recurring task
@@ -106,10 +106,11 @@ namespace task_scheduler.Tests
                 t.Action == "action" &&
                 t.IsRecurring &&
                 t.RecurrenceTime == recurrenceSeconds);
+            var initialScheduledTime = initialTask.ScheduledTime;
 
             //Assert - Ensure the initial task was scheduled correctly
             Assert.NotNull(initialTask);
-            Assert.True(initialTask.ScheduledTime >= startTime.AddMilliseconds(-100), "Initial scheduled time should be close to start time");
+            Assert.True(Math.Abs((initialScheduledTime - startTime.AddSeconds(recurrenceSeconds.TotalSeconds)).TotalMilliseconds) < 1, "Times are within 1ms");
 
             //Act - wait for the task to execute and check if it was rescheduled
             await Task.Delay(3000);
@@ -119,10 +120,16 @@ namespace task_scheduler.Tests
                 t.Action == "action" &&
                 t.IsRecurring &&
                 t.RecurrenceTime == recurrenceSeconds &&
-                t.ScheduledTime >= initialTask.ScheduledTime.AddSeconds(recurrenceSeconds.TotalSeconds - 0.1)
+                t.ScheduledTime >= initialScheduledTime.AddSeconds(recurrenceSeconds.TotalSeconds - 0.1)
             );
-            Assert.NotNull(rescheduledTask);
+            var rescheduledTime = rescheduledTask.ScheduledTime;
 
+            //Assert - Ensure the recurring task was scheduled correctly
+            Assert.NotNull(rescheduledTask);
+            Assert.True(
+                Math.Abs((rescheduledTime - initialScheduledTime.AddSeconds(recurrenceSeconds.TotalSeconds)).TotalMilliseconds) < 1,
+                "Rescheduled time is within 1ms of expected"
+            );
             service.Stop();
         }
 

@@ -74,6 +74,7 @@ namespace task_scheduler.Services
                     // If no tasks are scheduled, wait for a while before checking again
                     if (nextTask == null)
                     {
+                        //TODO - figure out why 2 delay functions
                         await Task.Delay(500, _cts.Token);
                         continue;
                     }
@@ -89,6 +90,7 @@ namespace task_scheduler.Services
                         try
                         {
                             //Asynchronously wait until next task's time or until canceled
+                            //TODO - figure out why 2 delay functions
                             await Task.Delay(delay, _delayCts.Token);
                         }
                         catch (OperationCanceledException)
@@ -131,19 +133,20 @@ namespace task_scheduler.Services
                         }
                         catch (Exception ex)
                         {
+                            //TODO - add logging of task details for error
                             _logger.LogError(ex, $"Error executing task '{taskToRun.Name}'");
                         }
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    //Figure out how to log task cancellation
+                    //TODO - figure out how to log task cancellation
                     _logger.LogInformation("Task processing cancelled.");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    //Figure out how to log unexpected task errors
+                    //TODO - add logging of task details for error
                     _logger.LogError(ex, $"Unexpected error in task processing loop for task");
                     await Task.Delay(1000, _cts.Token);
                 }
@@ -166,6 +169,7 @@ namespace task_scheduler.Services
         }
         public void Stop()
         {
+            //TODO - dispose cts tokens
             _logger.LogInformation("Stopping the task scheduler service...");
             _cts.Cancel();
         }
