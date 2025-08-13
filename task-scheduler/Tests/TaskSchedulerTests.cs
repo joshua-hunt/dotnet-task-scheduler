@@ -61,6 +61,7 @@ namespace task_scheduler.Tests
             Assert.Equal("task1", executedTask.Name);
             var diff = (executedTask.ExecutionTime - scheduledTime).Duration();
             Assert.True(diff < TimeSpan.FromMilliseconds(200), $"Execution time was off by {diff.TotalMilliseconds} ms");
+
             service.Stop();
         }
 
@@ -84,6 +85,8 @@ namespace task_scheduler.Tests
             Assert.Equal("task1", executedTasks[0].Name);
             Assert.Equal("task2", executedTasks[1].Name);
             Assert.Equal("task3", executedTasks[2].Name);
+
+            service.Stop();
         }
 
 
@@ -118,21 +121,24 @@ namespace task_scheduler.Tests
                 t.RecurrenceTime == recurrenceSeconds &&
                 t.ScheduledTime >= initialTask.ScheduledTime.AddSeconds(recurrenceSeconds.TotalSeconds - 0.1)
             );
-
             Assert.NotNull(rescheduledTask);
+
             service.Stop();
         }
 
         [Fact]
         public void ListTasksLogsScheduledTasks()
         {
+            //Arrange - create a service instance and schedule some tasks
             var service = new TaskSchedulerService(_mockLogger.Object);
 
             service.ScheduleTask("task1", DateTime.Now.AddMinutes(1), "action", false);
             service.ScheduleTask("task2", DateTime.Now.AddMinutes(2), "action", true);
 
+            //Act - call ListTasks to log the scheduled tasks
             service.ListTasks();
 
+            //Assert - verify that the logger was called with the expected messages
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Information,
@@ -141,7 +147,6 @@ namespace task_scheduler.Tests
                     null,
                     It.IsAny<Func<It.IsAnyType, Exception, string>>()),
                 Times.Once);
-
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Information,
@@ -150,17 +155,20 @@ namespace task_scheduler.Tests
                     null,
                     It.IsAny<Func<It.IsAnyType, Exception, string>>()),
                 Times.Once);
-
+            
             service.Stop();
         }
 
         [Fact]
         public void ListTasksLogsNoTasksMessageIfQueueEmpty()
         {
+            //Arrange - create a service instance without scheduling any tasks
             var service = new TaskSchedulerService(_mockLogger.Object);
 
+            //Act - call ListTasks to log the scheduled tasks
             service.ListTasks();
 
+            //Assert - verify that the logger was called with the expected message for no tasks
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Information,
@@ -176,10 +184,13 @@ namespace task_scheduler.Tests
         [Fact]
         public void StopCancelsProcessingAndLogs()
         {
+            //Arrange - create a service instance
             var service = new TaskSchedulerService(_mockLogger.Object);
 
+            //Act - call Stop to cancel processing
             service.Stop();
 
+            //Assert - verify that the logger was called with the expected message
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Information,
